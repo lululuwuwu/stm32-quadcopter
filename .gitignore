@@ -1,6 +1,12 @@
-# Keil 编译文件
+# =========================
+# Keil
+# =========================
+
 Objects/
 Listings/
+Debug/
+Release/
+DebugConfig/
 
 *.o
 *.d
@@ -9,18 +15,29 @@ Listings/
 *.axf
 *.lst
 *.lib
+*.dep
+*.lnp
 
-# STM32 build
-Debug/
-Release/
+*.uvguix.*
+*.uvoptx
 
-# VSCode
-.vscode/*.log
+# =========================
+# VS Code
+# =========================
 
-# 临时文件
+.vscode/
+
+# =========================
+# Logs / Temp
+# =========================
+
+*.log
 *.tmp
 *.bak
 
-# 系统文件
+# =========================
+# System
+# =========================
+
 .DS_Store
 Thumbs.db
