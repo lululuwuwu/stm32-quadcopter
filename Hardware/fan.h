@@ -1,16 +1,16 @@
 #ifndef __FAN_H
 #define __FAN_H
 
-//åˆå§‹åŒ–
+//³õÊ¼»¯
 void Fan_Init(void);
 
-//å¼€
+//¿ª
 void Fan_On(void);
 
-//å…³
+//¹Ø
 void Fan_Off(void);
 
-//åˆ‡æ¢
+//ÇĞ»»
 void Fan_Toggle(void);
 
 #endif

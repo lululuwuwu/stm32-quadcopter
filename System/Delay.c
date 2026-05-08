@@ -1,23 +1,23 @@
 #include "stm32f10x.h"
 
 /**
-  * @brief  å¾®ç§’çº§å»¶æ—¶
-  * @param  xus å»¶æ—¶æ—¶é•¿ï¼ŒèŒƒå›´ï¼š0~233015
-  * @retval æ— 
+  * @brief  Î¢Ãë¼¶ÑÓÊ±
+  * @param  xus ÑÓÊ±Ê±³¤£¬·¶Î§£º0~233015
+  * @retval ÎÞ
   */
 void Delay_us(uint32_t xus)
 {
-	SysTick->LOAD = 72 * xus;				//è®¾ç½®å®šæ—¶å™¨é‡è£…å€¼
-	SysTick->VAL = 0x00;					//æ¸…ç©ºå½“å‰è®¡æ•°å€¼
-	SysTick->CTRL = 0x00000005;				//è®¾ç½®æ—¶é’Ÿæºä¸ºHCLKï¼Œå¯åŠ¨å®šæ—¶å™¨
-	while(!(SysTick->CTRL & 0x00010000));	//ç­‰å¾…è®¡æ•°åˆ°0
-	SysTick->CTRL = 0x00000004;				//å…³é—­å®šæ—¶å™¨
+	SysTick->LOAD = 72 * xus;				//ÉèÖÃ¶¨Ê±Æ÷ÖØ×°Öµ
+	SysTick->VAL = 0x00;					//Çå¿Õµ±Ç°¼ÆÊýÖµ
+	SysTick->CTRL = 0x00000005;				//ÉèÖÃÊ±ÖÓÔ´ÎªHCLK£¬Æô¶¯¶¨Ê±Æ÷
+	while(!(SysTick->CTRL & 0x00010000));	//µÈ´ý¼ÆÊýµ½0
+	SysTick->CTRL = 0x00000004;				//¹Ø±Õ¶¨Ê±Æ÷
 }
 
 /**
-  * @brief  æ¯«ç§’çº§å»¶æ—¶
-  * @param  xms å»¶æ—¶æ—¶é•¿ï¼ŒèŒƒå›´ï¼š0~4294967295
-  * @retval æ— 
+  * @brief  ºÁÃë¼¶ÑÓÊ±
+  * @param  xms ÑÓÊ±Ê±³¤£¬·¶Î§£º0~4294967295
+  * @retval ÎÞ
   */
 void Delay_ms(uint32_t xms)
 {
@@ -28,9 +28,9 @@ void Delay_ms(uint32_t xms)
 }
  
 /**
-  * @brief  ç§’çº§å»¶æ—¶
-  * @param  xs å»¶æ—¶æ—¶é•¿ï¼ŒèŒƒå›´ï¼š0~4294967295
-  * @retval æ— 
+  * @brief  Ãë¼¶ÑÓÊ±
+  * @param  xs ÑÓÊ±Ê±³¤£¬·¶Î§£º0~4294967295
+  * @retval ÎÞ
   */
 void Delay_s(uint32_t xs)
 {
