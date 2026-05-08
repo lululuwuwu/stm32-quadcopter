@@ -4,7 +4,6 @@
 #define RC_VALUE_MIN 1000
 #define RC_VALUE_MAX 2000
 #define RC_VALUE_RANGE (RC_VALUE_MAX - RC_VALUE_MIN)
-#define ADC_REFERENCE_MV 3300U
 
 /* DMA 循环写入的摇杆原始 ADC 值。
  * 数组顺序必须和 ADC_RegularChannelConfig 的规则通道顺序保持一致。
@@ -36,7 +35,7 @@ void StickADC_Init(void)
     RCC_AHBPeriphClockCmd(STICK_DMA_RCC, ENABLE);
     RCC_ADCCLKConfig(RCC_PCLK2_Div6);
 
-    /* PA0~PA3 接摇杆电位器输出，必须配置为模拟输入，避免数字输入电路影响采样。 */
+    /* PA0~PA3 接摇杆电位器输出，配置为模拟输入。 */
     gpio_init.GPIO_Mode = GPIO_Mode_AIN;
     gpio_init.GPIO_Pin = STICK_THR_PIN | STICK_YAW_PIN | STICK_PITH_PIN | STICK_ROLL_PIN;
     gpio_init.GPIO_Speed = GPIO_Speed_50MHz;
@@ -71,14 +70,14 @@ void StickADC_Init(void)
     /* 规则通道顺序决定 StickADCRaw[] 的下标含义：
      * [0] 油门 PA1, [1] 偏航 PA0, [2] 俯仰 PA3, [3] 翻滚 PA2。
      */
-    ADC_RegularChannelConfig(ADC1, ADC_Channel_1, 1, ADC_SampleTime_55Cycles5); // THR: PA1
-    ADC_RegularChannelConfig(ADC1, ADC_Channel_0, 2, ADC_SampleTime_55Cycles5); // YAW: PA0
-    ADC_RegularChannelConfig(ADC1, ADC_Channel_3, 3, ADC_SampleTime_55Cycles5); // PIT: PA3
-    ADC_RegularChannelConfig(ADC1, ADC_Channel_2, 4, ADC_SampleTime_55Cycles5); // ROL: PA2
+    ADC_RegularChannelConfig(ADC1, ADC_Channel_1, 1, ADC_SampleTime_55Cycles5);
+    ADC_RegularChannelConfig(ADC1, ADC_Channel_0, 2, ADC_SampleTime_55Cycles5);
+    ADC_RegularChannelConfig(ADC1, ADC_Channel_3, 3, ADC_SampleTime_55Cycles5);
+    ADC_RegularChannelConfig(ADC1, ADC_Channel_2, 4, ADC_SampleTime_55Cycles5);
 
     ADC_DMACmd(ADC1, ENABLE);
 
-    /* 上电后执行一次 ADC 自校准，减小内部电容阵列误差带来的采样偏差。 */
+    /* 上电后执行一次 ADC 自校准，减小内部误差带来的采样偏差。 */
     ADC_Cmd(ADC1, DISABLE);
     for (volatile uint32_t i = 0; i < 10000; i++)
     {
@@ -100,15 +99,8 @@ void StickADC_Init(void)
     ADC_SoftwareStartConvCmd(ADC1, ENABLE);
 }
 
-void MyADC_Init(void)
-{
-    /* 保留原来的 MyADC_Init 入口，工程其他位置仍可按旧接口初始化 ADC。 */
-    StickADC_Init();
-}
-
 uint16_t StickADC_GetRaw(StickAxisTypeDef axis)
 {
-    /* 防止传入非法轴编号导致数组越界。 */
     if (axis >= STICK_AXIS_COUNT)
     {
         return 0;
@@ -120,18 +112,4 @@ uint16_t StickADC_GetRaw(StickAxisTypeDef axis)
 int16_t StickADC_GetRCValue(StickAxisTypeDef axis)
 {
     return StickADC_MapToRC(StickADC_GetRaw(axis));
-}
-
-uint16_t MyADC_GetDataValue(void)
-{
-    /* 兼容旧接口：默认返回 PA0/YAW 的原始采样值。 */
-    return StickADC_GetRaw(STICK_AXIS_YAW);
-}
-
-uint16_t MyADC_GetAnalogValue(void)
-{
-    /* 兼容旧接口：按 3.3V 参考电压把 PA0/YAW 原始值换算为毫伏。 */
-    return (uint16_t)(((uint32_t)StickADC_GetRaw(STICK_AXIS_YAW) * ADC_REFERENCE_MV +
-                       ADC_FULL_SCALE / 2U) /
-                      ADC_FULL_SCALE);
 }

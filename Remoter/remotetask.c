@@ -150,7 +150,7 @@ void vTaskStickScan(void *paramters)
     (void)paramters;
 
     /* ADC 初始化一次即可；DMA 会在后台持续刷新四路摇杆原始值。 */
-    MyADC_Init();
+    StickADC_Init();
 
     while (1)
     {

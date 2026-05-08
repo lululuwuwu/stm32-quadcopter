@@ -24,22 +24,13 @@ typedef enum
     STICK_AXIS_COUNT
 } StickAxisTypeDef;
 
-// 初始化 ADC, 当前用于摇杆 ADC1 + DMA1_Channel1 循环采样。
-void MyADC_Init(void);
-
-// 获取 PA0/YAW 原始数字值, 范围 0~4095。
-uint16_t MyADC_GetDataValue(void);
-
-// 获取 PA0/YAW 模拟电压值, 返回 mv(毫伏), 按 3.3V 参考估算。
-uint16_t MyADC_GetAnalogValue(void);
-
-// 摇杆 ADC 初始化, 使用 ADC1 + DMA1_Channel1 循环采样 PA0~PA3。
+// 摇杆 ADC 初始化，使用 ADC1 + DMA1_Channel1 循环采样 PA0~PA3。
 void StickADC_Init(void);
 
-// 获取指定摇杆轴原始 ADC 值, 范围 0~4095。
+// 获取指定摇杆轴原始 ADC 值，范围 0~4095。
 uint16_t StickADC_GetRaw(StickAxisTypeDef axis);
 
-// 获取指定摇杆轴遥控量, 范围 1000~2000。
+// 获取指定摇杆轴遥控量，范围 1000~2000。
 int16_t StickADC_GetRCValue(StickAxisTypeDef axis);
 
 #endif
