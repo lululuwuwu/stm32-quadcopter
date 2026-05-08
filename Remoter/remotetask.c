@@ -16,7 +16,8 @@ typedef enum
     REMOTER_LED_BLUE
 } RemoterLedTypeDef;
 
-/* 遥控量最终限制在 1000~2000，避免微调或校准后超过飞控期望范围。 */
+static uint8_t RemoterStickCalibrating;
+
 static int16_t RemoterLimitRC(int16_t value)
 {
     if (value < REMOTER_RC_MIN)
@@ -34,7 +35,6 @@ static int16_t RemoterLimitRC(int16_t value)
 
 static void RemoterDataInit(void)
 {
-    /* 上电先给遥控数据一个安全默认值，ADC 任务启动后会持续刷新摇杆数据。 */
     memset(&RemoterData, 0, sizeof(RemoterData));
     RemoterData.windows = 0;
     RemoterData.NRF_Channel = 28;
@@ -42,14 +42,20 @@ static void RemoterDataInit(void)
     RemoterData.YAW = REMOTER_RC_CENTER;
     RemoterData.PIT = REMOTER_RC_CENTER;
     RemoterData.ROL = REMOTER_RC_CENTER;
+    RemoterStickCalibrating = 0;
 }
 
 static void RemoterStickUpdate(void)
 {
-    /* 从 ADC DMA 缓冲区读取四个摇杆轴，并写入 RemoterData 供 OLED 和通信任务使用。 */
+    StickADC_FilterUpdate();
+
+    if (StickADC_IsCalibrationRunning())
+    {
+        StickADC_CalibrationSample();
+    }
+
     RemoterData.THR = StickADC_GetRCValue(STICK_AXIS_THR);
 
-    /* 偏航、俯仰、翻滚允许叠加按键微调；油门不叠加微调，避免上电油门被抬高。 */
     RemoterData.YAW = RemoterLimitRC(StickADC_GetRCValue(STICK_AXIS_YAW) + RemoterData.OffSet_Yaw);
     RemoterData.PIT = RemoterLimitRC(StickADC_GetRCValue(STICK_AXIS_PIT) + RemoterData.OffSet_Pit);
     RemoterData.ROL = RemoterLimitRC(StickADC_GetRCValue(STICK_AXIS_ROL) + RemoterData.OffSet_Rol);
@@ -94,13 +100,35 @@ static void RemoterFeedback(RemoterLedTypeDef led, uint8_t count)
     }
 }
 
-static void RemoterJoystickCalibrate(void)
+static uint8_t RemoterJoystickCalibrate(void)
 {
-    /* 校准时把当前三轴摇杆位置作为中点，计算出让输出回到 1500 的补偿量。 */
-    RemoterData.OffSet_Pit = REMOTER_RC_CENTER - StickADC_GetRCValue(STICK_AXIS_PIT);
-    RemoterData.OffSet_Rol = REMOTER_RC_CENTER - StickADC_GetRCValue(STICK_AXIS_ROL);
-    RemoterData.OffSet_Yaw = REMOTER_RC_CENTER - StickADC_GetRCValue(STICK_AXIS_YAW);
+    uint8_t result;
+
+    result = StickADC_CalibrationSetCenter(1);
     RemoterStickUpdate();
+    return result;
+}
+
+static void RemoterJoystickFullCalibrationToggle(void)
+{
+    if (!RemoterStickCalibrating)
+    {
+        StickADC_CalibrationStart();
+        RemoterStickCalibrating = 1;
+        RemoterFeedback(REMOTER_LED_BLUE, 2);
+        return;
+    }
+
+    RemoterStickCalibrating = 0;
+    if (StickADC_CalibrationFinish(1))
+    {
+        RemoterStickUpdate();
+        RemoterFeedback(REMOTER_LED_BLUE, 3);
+    }
+    else
+    {
+        RemoterFeedback(REMOTER_LED_RED, 5);
+    }
 }
 
 static void RemoterKeyProcess(KeyEventTypeDef event)
@@ -113,11 +141,27 @@ static void RemoterKeyProcess(KeyEventTypeDef event)
             break;
 
         case KEY_EVENT_RIGHT_LONG:
+            RemoterJoystickFullCalibrationToggle();
             break;
 
         case KEY_EVENT_LEFT_LONG:
-            RemoterJoystickCalibrate();
-            RemoterFeedback(REMOTER_LED_RED, 3);
+            if (RemoterStickCalibrating)
+            {
+                StickADC_CalibrationCancel();
+                RemoterStickCalibrating = 0;
+                RemoterFeedback(REMOTER_LED_RED, 1);
+            }
+            else
+            {
+                if (RemoterJoystickCalibrate())
+                {
+                    RemoterFeedback(REMOTER_LED_RED, 3);
+                }
+                else
+                {
+                    RemoterFeedback(REMOTER_LED_RED, 5);
+                }
+            }
             break;
 
         case KEY_EVENT_OFFSET_UP_SHORT:
@@ -149,12 +193,10 @@ void vTaskStickScan(void *paramters)
 {
     (void)paramters;
 
-    /* ADC 初始化一次即可；DMA 会在后台持续刷新四路摇杆原始值。 */
     StickADC_Init();
 
     while (1)
     {
-        /* 20ms 更新一次遥控数据，和按键扫描周期保持一致，响应足够平滑。 */
         RemoterStickUpdate();
         vTaskDelay(pdMS_TO_TICKS(REMOTER_STICK_SCAN_PERIOD_MS));
     }
@@ -206,7 +248,6 @@ void RemoterCreateTask(void *paramters)
 {
     (void)paramters;
 
-    /* 创建各任务前先初始化共享数据，避免 OLED 任务先运行时显示未定义值。 */
     RemoterDataInit();
 
     taskENTER_CRITICAL();

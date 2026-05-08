@@ -3,18 +3,18 @@
 
 #include "stm32f10x.h"
 
-// 摇杆引脚和外设定义
+/* Stick pins and peripherals. */
 #define STICK_ADC_RCC RCC_APB2Periph_ADC1
 #define STICK_DMA_RCC RCC_AHBPeriph_DMA1
 #define STICK_RCC RCC_APB2Periph_GPIOA
 #define STICK_GPIO GPIOA
-#define STICK_THR_PIN GPIO_Pin_1  // 油门：ADC_Channel_1
-#define STICK_YAW_PIN GPIO_Pin_0  // 偏航：ADC_Channel_0
-#define STICK_PITH_PIN GPIO_Pin_3 // 俯仰：ADC_Channel_3
-#define STICK_ROLL_PIN GPIO_Pin_2 // 翻滚：ADC_Channel_2
+#define STICK_THR_PIN GPIO_Pin_1  /* THR: ADC_Channel_1 */
+#define STICK_YAW_PIN GPIO_Pin_0  /* YAW: ADC_Channel_0 */
+#define STICK_PITH_PIN GPIO_Pin_3 /* PIT: ADC_Channel_3 */
+#define STICK_ROLL_PIN GPIO_Pin_2 /* ROL: ADC_Channel_2 */
 #define STICK_PITCH_PIN STICK_PITH_PIN
 
-// 摇杆轴编号，顺序和 DMA 缓冲区 StickADCRaw[] 的顺序一致。
+/* Axis order matches StickADCRaw[] DMA buffer order. */
 typedef enum
 {
     STICK_AXIS_THR = 0,
@@ -24,13 +24,25 @@ typedef enum
     STICK_AXIS_COUNT
 } StickAxisTypeDef;
 
-// 摇杆 ADC 初始化，使用 ADC1 + DMA1_Channel1 循环采样 PA0~PA3。
 void StickADC_Init(void);
 
-// 获取指定摇杆轴原始 ADC 值，范围 0~4095。
-uint16_t StickADC_GetRaw(StickAxisTypeDef axis);
+/* Read one DMA sample per axis into the moving average window. */
+void StickADC_FilterUpdate(void);
 
-// 获取指定摇杆轴遥控量，范围 1000~2000。
+uint16_t StickADC_GetRaw(StickAxisTypeDef axis);
+uint16_t StickADC_GetFilteredRaw(StickAxisTypeDef axis);
+
+/* Get calibrated RC value, range 1000~2000. */
 int16_t StickADC_GetRCValue(StickAxisTypeDef axis);
+
+/* Full calibration: start, move sticks to limits, return to center, finish. */
+void StickADC_CalibrationStart(void);
+void StickADC_CalibrationSample(void);
+uint8_t StickADC_CalibrationFinish(uint8_t save_to_flash);
+void StickADC_CalibrationCancel(void);
+uint8_t StickADC_IsCalibrationRunning(void);
+
+/* Fast center calibration for YAW/PIT/ROL. */
+uint8_t StickADC_CalibrationSetCenter(uint8_t save_to_flash);
 
 #endif

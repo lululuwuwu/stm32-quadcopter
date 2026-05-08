@@ -1,6 +1,8 @@
 #ifndef __MYFLASH_H
 #define __MYFLASH_H
 
+#include "stm32f10x.h"
+
 void MyFLASH_Init(void);
 
 uint8_t MyFLASH_ReadByte(uint32_t address);
