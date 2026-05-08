@@ -1,10 +1,14 @@
 #include "board.h"
 
 #define REMOTER_KEY_SCAN_PERIOD_MS 20
+#define REMOTER_STICK_SCAN_PERIOD_MS 20
 #define REMOTER_FEEDBACK_ON_MS 80
 #define REMOTER_FEEDBACK_OFF_MS 120
 #define REMOTER_WINDOW_COUNT 4
 #define REMOTER_TRIM_STEP 10
+#define REMOTER_RC_MIN 1000
+#define REMOTER_RC_CENTER 1500
+#define REMOTER_RC_MAX 2000
 
 typedef enum
 {
@@ -12,10 +16,48 @@ typedef enum
     REMOTER_LED_BLUE
 } RemoterLedTypeDef;
 
-/* 根据业务传入的颜色，打开对应的 LED。 */
+/* 遥控量最终限制在 1000~2000，避免微调或校准后超过飞控期望范围。 */
+static int16_t RemoterLimitRC(int16_t value)
+{
+    if (value < REMOTER_RC_MIN)
+    {
+        return REMOTER_RC_MIN;
+    }
+
+    if (value > REMOTER_RC_MAX)
+    {
+        return REMOTER_RC_MAX;
+    }
+
+    return value;
+}
+
+static void RemoterDataInit(void)
+{
+    /* 上电先给遥控数据一个安全默认值，ADC 任务启动后会持续刷新摇杆数据。 */
+    memset(&RemoterData, 0, sizeof(RemoterData));
+    RemoterData.windows = 0;
+    RemoterData.NRF_Channel = 28;
+    RemoterData.THR = REMOTER_RC_MIN;
+    RemoterData.YAW = REMOTER_RC_CENTER;
+    RemoterData.PIT = REMOTER_RC_CENTER;
+    RemoterData.ROL = REMOTER_RC_CENTER;
+}
+
+static void RemoterStickUpdate(void)
+{
+    /* 从 ADC DMA 缓冲区读取四个摇杆轴，并写入 RemoterData 供 OLED 和通信任务使用。 */
+    RemoterData.THR = StickADC_GetRCValue(STICK_AXIS_THR);
+
+    /* 偏航、俯仰、翻滚允许叠加按键微调；油门不叠加微调，避免上电油门被抬高。 */
+    RemoterData.YAW = RemoterLimitRC(StickADC_GetRCValue(STICK_AXIS_YAW) + RemoterData.OffSet_Yaw);
+    RemoterData.PIT = RemoterLimitRC(StickADC_GetRCValue(STICK_AXIS_PIT) + RemoterData.OffSet_Pit);
+    RemoterData.ROL = RemoterLimitRC(StickADC_GetRCValue(STICK_AXIS_ROL) + RemoterData.OffSet_Rol);
+}
+
 static void RemoterLedOn(RemoterLedTypeDef led)
 {
-    if(led == REMOTER_LED_RED)
+    if (led == REMOTER_LED_RED)
     {
         LED_RedOn();
     }
@@ -27,7 +69,7 @@ static void RemoterLedOn(RemoterLedTypeDef led)
 
 static void RemoterLedOff(RemoterLedTypeDef led)
 {
-    if(led == REMOTER_LED_RED)
+    if (led == REMOTER_LED_RED)
     {
         LED_RedOff();
     }
@@ -37,12 +79,11 @@ static void RemoterLedOff(RemoterLedTypeDef led)
     }
 }
 
-/* 按业务要求闪烁指定颜色 LED，同时让蜂鸣器响相同次数。 */
 static void RemoterFeedback(RemoterLedTypeDef led, uint8_t count)
 {
     uint8_t i;
 
-    for(i = 0; i < count; i++)
+    for (i = 0; i < count; i++)
     {
         RemoterLedOn(led);
         Buzzer_On();
@@ -55,58 +96,67 @@ static void RemoterFeedback(RemoterLedTypeDef led, uint8_t count)
 
 static void RemoterJoystickCalibrate(void)
 {
-    /* 当前工程还没有摇杆 ADC 中心值保存模块，这里先把微调值归零作为校准入口。 */
-    RemoterData.OffSet_Pit = 0;
-    RemoterData.OffSet_Rol = 0;
-    RemoterData.OffSet_Yaw = 0;
+    /* 校准时把当前三轴摇杆位置作为中点，计算出让输出回到 1500 的补偿量。 */
+    RemoterData.OffSet_Pit = REMOTER_RC_CENTER - StickADC_GetRCValue(STICK_AXIS_PIT);
+    RemoterData.OffSet_Rol = REMOTER_RC_CENTER - StickADC_GetRCValue(STICK_AXIS_ROL);
+    RemoterData.OffSet_Yaw = REMOTER_RC_CENTER - StickADC_GetRCValue(STICK_AXIS_YAW);
+    RemoterStickUpdate();
 }
 
 static void RemoterKeyProcess(KeyEventTypeDef event)
 {
-    switch(event)
+    switch (event)
     {
         case KEY_EVENT_RIGHT_SHORT:
-            /* 右上短按：切换 OLED 页面，蓝灯和蜂鸣器反馈 1 次。 */
             RemoterData.windows = (RemoterData.windows + 1) % REMOTER_WINDOW_COUNT;
             RemoterFeedback(REMOTER_LED_BLUE, 1);
             break;
 
         case KEY_EVENT_RIGHT_LONG:
-            /* 右上长按：原需求是对频；当前项目固定通信频率，因此不执行对频。 */
             break;
 
         case KEY_EVENT_LEFT_LONG:
-            /* 左上长按：遥感值校准，红灯和蜂鸣器反馈 3 次。 */
             RemoterJoystickCalibrate();
             RemoterFeedback(REMOTER_LED_RED, 3);
             break;
 
         case KEY_EVENT_OFFSET_UP_SHORT:
-            /* 微调上键：俯仰微调 +10。 */
             RemoterData.OffSet_Pit += REMOTER_TRIM_STEP;
             RemoterFeedback(REMOTER_LED_RED, 1);
             break;
 
         case KEY_EVENT_OFFSET_DOWN_SHORT:
-            /* 微调下键：俯仰微调 -10。 */
             RemoterData.OffSet_Pit -= REMOTER_TRIM_STEP;
             RemoterFeedback(REMOTER_LED_RED, 1);
             break;
 
         case KEY_EVENT_OFFSET_LEFT_SHORT:
-            /* 微调左键：翻滚微调 +10。 */
             RemoterData.OffSet_Rol += REMOTER_TRIM_STEP;
             RemoterFeedback(REMOTER_LED_RED, 1);
             break;
 
         case KEY_EVENT_OFFSET_RIGHT_SHORT:
-            /* 微调右键：翻滚微调 -10。 */
             RemoterData.OffSet_Rol -= REMOTER_TRIM_STEP;
             RemoterFeedback(REMOTER_LED_RED, 1);
             break;
 
         default:
             break;
+    }
+}
+
+void vTaskStickScan(void *paramters)
+{
+    (void)paramters;
+
+    /* ADC 初始化一次即可；DMA 会在后台持续刷新四路摇杆原始值。 */
+    MyADC_Init();
+
+    while (1)
+    {
+        /* 20ms 更新一次遥控数据，和按键扫描周期保持一致，响应足够平滑。 */
+        RemoterStickUpdate();
+        vTaskDelay(pdMS_TO_TICKS(REMOTER_STICK_SCAN_PERIOD_MS));
     }
 }
 
@@ -118,21 +168,21 @@ void vTaskKeyProcess(void *paramters)
     LED_Init();
     Buzzer_Init();
 
-    while(1)
+    while (1)
     {
-        /* 20ms 扫描一次按键，扫描函数本身不阻塞任务。 */
         RemoterKeyProcess(Key_ScanEvent());
         vTaskDelay(pdMS_TO_TICKS(REMOTER_KEY_SCAN_PERIOD_MS));
     }
 }
 
-void vTaskSerial1SendLogCode(void * pvParameters)
+void vTaskSerial1SendLogCode(void *pvParameters)
 {
     char pvBuffer[uxQueueSerial1ItemSize];
 
+    (void)pvParameters;
     Serial1_Init();
 
-    while(1)
+    while (1)
     {
         xQueueReceive(xQueueSerial1, pvBuffer, portMAX_DELAY);
         Serial1_SendString(pvBuffer);
@@ -145,31 +195,10 @@ void vTaskOLEDShow(void *paramters)
 
     Show_Init();
 
-    RemoterData.windows = 3;
-    RemoterData.NRF_Channel = 28;
-    RemoterData.NRF_Connect = 1;
-    RemoterData.RC_low_power = 0;
-    RemoterData.Fly_low_power = 1;
-    RemoterData.NRF_RSSI_count = 51;
-    RemoterData.Battery_RC = 3789;
-    RemoterData.Battery_Fly = 3678;
-    RemoterData.THR = 1111;
-    RemoterData.ROL = 1112;
-    RemoterData.YAW = 1113;
-    RemoterData.PIT = 1114;
-    RemoterData.OffSet_Pit = 12;
-    RemoterData.OffSet_Rol = 13;
-    RemoterData.OffSet_Yaw = 14;
-    RemoterData.X = 101;
-    RemoterData.Y = 102;
-    RemoterData.Z = 103;
-    RemoterData.H = 104;
-    RemoterData.fly_test_flag = 0x03;
-
-    while(1)
+    while (1)
     {
         Show_Refresh();
-        vTaskDelay(500);
+        vTaskDelay(pdMS_TO_TICKS(500));
     }
 }
 
@@ -177,12 +206,16 @@ void RemoterCreateTask(void *paramters)
 {
     (void)paramters;
 
+    /* 创建各任务前先初始化共享数据，避免 OLED 任务先运行时显示未定义值。 */
+    RemoterDataInit();
+
     taskENTER_CRITICAL();
 
     xTaskCreate(vTaskSerial1SendLogCode, "TaskSerial1Log", 256, NULL,
                 (configMAX_PRIORITIES - 1), NULL);
     xTaskCreate(vTaskOLEDShow, "TaskOLEDShow", 256, NULL, 1, NULL);
     xTaskCreate(vTaskKeyProcess, "TaskKeyProcess", 128, NULL, 2, NULL);
+    xTaskCreate(vTaskStickScan, "TaskStickScan", 128, NULL, 2, NULL);
 
     taskEXIT_CRITICAL();
 

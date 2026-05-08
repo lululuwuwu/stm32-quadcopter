@@ -430,6 +430,16 @@
               <FileType>5</FileType>
               <FilePath>.\Hardware\buzzer.h</FilePath>
             </File>
+            <File>
+              <FileName>MyADC.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\Hardware\MyADC.c</FilePath>
+            </File>
+            <File>
+              <FileName>MyADC.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\Hardware\MyADC.h</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>

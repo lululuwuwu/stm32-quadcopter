@@ -12,11 +12,11 @@ typedef struct
     uint16_t pin;
     KeyEventTypeDef short_event;
     KeyEventTypeDef long_event;
-    uint8_t raw_pressed;
-    uint8_t stable_pressed;
-    uint8_t same_count;
-    uint8_t long_sent;
-    TickType_t press_tick;
+    uint8_t raw_pressed;  //最近一次读到的原始状态
+    uint8_t stable_pressed; //消抖后的稳定状态
+    uint8_t same_count; //原始状态连续相同的次数
+    uint8_t long_sent;  // 长按是否已经触发过
+    TickType_t press_tick;  //  按下时刻，用来计算长按时间
 } KeyStateTypeDef;
 
 static KeyStateTypeDef KeyStates[] =

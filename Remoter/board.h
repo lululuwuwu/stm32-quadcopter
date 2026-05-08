@@ -11,6 +11,7 @@
 #include "semphr.h"
 
 #include "Serial1.h"
+#include "MyADC.h"
 #include "key.h"
 #include "led.h"
 #include "buzzer.h"
