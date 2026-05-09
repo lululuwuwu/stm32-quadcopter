@@ -17,6 +17,8 @@
 #include "buzzer.h"
 #include "remotetask.h"
 #include "remoterData.h"
+#include "remoterstick.h"
+#include "remoterkey.h"
 #include "show.h"
 
 #include "OLED.h"

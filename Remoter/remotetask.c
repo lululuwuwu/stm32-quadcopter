@@ -2,37 +2,16 @@
 
 #define REMOTER_KEY_SCAN_PERIOD_MS 20
 #define REMOTER_STICK_SCAN_PERIOD_MS 20
-#define REMOTER_FEEDBACK_ON_MS 80
-#define REMOTER_FEEDBACK_OFF_MS 120
-#define REMOTER_WINDOW_COUNT 4
-#define REMOTER_TRIM_STEP 10
 #define REMOTER_RC_MIN 1000
 #define REMOTER_RC_CENTER 1500
-#define REMOTER_RC_MAX 2000
 
-typedef enum
-{
-    REMOTER_LED_RED = 0,
-    REMOTER_LED_BLUE
-} RemoterLedTypeDef;
-
-static uint8_t RemoterStickCalibrating;
-
-static int16_t RemoterLimitRC(int16_t value)
-{
-    if (value < REMOTER_RC_MIN)
-    {
-        return REMOTER_RC_MIN;
-    }
-
-    if (value > REMOTER_RC_MAX)
-    {
-        return REMOTER_RC_MAX;
-    }
-
-    return value;
-}
-
+/*
+ * 初始化全局 RemoterData。
+ * 创建任务前先给遥控数据安全默认值：
+ *   THR 油门最低 1000, 避免上电瞬间误给油；
+ *   YAW/PIT/ROL 回中 1500；
+ *   其他字段清零。
+ */
 static void RemoterDataInit(void)
 {
     memset(&RemoterData, 0, sizeof(RemoterData));
@@ -42,153 +21,14 @@ static void RemoterDataInit(void)
     RemoterData.YAW = REMOTER_RC_CENTER;
     RemoterData.PIT = REMOTER_RC_CENTER;
     RemoterData.ROL = REMOTER_RC_CENTER;
-    RemoterStickCalibrating = 0;
+    RemoterStick_ResetCalibrationState();
 }
 
-static void RemoterStickUpdate(void)
-{
-    StickADC_FilterUpdate();
-
-    if (StickADC_IsCalibrationRunning())
-    {
-        StickADC_CalibrationSample();
-    }
-
-    RemoterData.THR = StickADC_GetRCValue(STICK_AXIS_THR);
-
-    RemoterData.YAW = RemoterLimitRC(StickADC_GetRCValue(STICK_AXIS_YAW) + RemoterData.OffSet_Yaw);
-    RemoterData.PIT = RemoterLimitRC(StickADC_GetRCValue(STICK_AXIS_PIT) + RemoterData.OffSet_Pit);
-    RemoterData.ROL = RemoterLimitRC(StickADC_GetRCValue(STICK_AXIS_ROL) + RemoterData.OffSet_Rol);
-}
-
-static void RemoterLedOn(RemoterLedTypeDef led)
-{
-    if (led == REMOTER_LED_RED)
-    {
-        LED_RedOn();
-    }
-    else
-    {
-        LED_BlueOn();
-    }
-}
-
-static void RemoterLedOff(RemoterLedTypeDef led)
-{
-    if (led == REMOTER_LED_RED)
-    {
-        LED_RedOff();
-    }
-    else
-    {
-        LED_BlueOff();
-    }
-}
-
-static void RemoterFeedback(RemoterLedTypeDef led, uint8_t count)
-{
-    uint8_t i;
-
-    for (i = 0; i < count; i++)
-    {
-        RemoterLedOn(led);
-        Buzzer_On();
-        vTaskDelay(pdMS_TO_TICKS(REMOTER_FEEDBACK_ON_MS));
-        Buzzer_Off();
-        RemoterLedOff(led);
-        vTaskDelay(pdMS_TO_TICKS(REMOTER_FEEDBACK_OFF_MS));
-    }
-}
-
-static uint8_t RemoterJoystickCalibrate(void)
-{
-    uint8_t result;
-
-    result = StickADC_CalibrationSetCenter(1);
-    RemoterStickUpdate();
-    return result;
-}
-
-static void RemoterJoystickFullCalibrationToggle(void)
-{
-    if (!RemoterStickCalibrating)
-    {
-        StickADC_CalibrationStart();
-        RemoterStickCalibrating = 1;
-        RemoterFeedback(REMOTER_LED_BLUE, 2);
-        return;
-    }
-
-    RemoterStickCalibrating = 0;
-    if (StickADC_CalibrationFinish(1))
-    {
-        RemoterStickUpdate();
-        RemoterFeedback(REMOTER_LED_BLUE, 3);
-    }
-    else
-    {
-        RemoterFeedback(REMOTER_LED_RED, 5);
-    }
-}
-
-static void RemoterKeyProcess(KeyEventTypeDef event)
-{
-    switch (event)
-    {
-        case KEY_EVENT_RIGHT_SHORT:
-            RemoterData.windows = (RemoterData.windows + 1) % REMOTER_WINDOW_COUNT;
-            RemoterFeedback(REMOTER_LED_BLUE, 1);
-            break;
-
-        case KEY_EVENT_RIGHT_LONG:
-            RemoterJoystickFullCalibrationToggle();
-            break;
-
-        case KEY_EVENT_LEFT_LONG:
-            if (RemoterStickCalibrating)
-            {
-                StickADC_CalibrationCancel();
-                RemoterStickCalibrating = 0;
-                RemoterFeedback(REMOTER_LED_RED, 1);
-            }
-            else
-            {
-                if (RemoterJoystickCalibrate())
-                {
-                    RemoterFeedback(REMOTER_LED_RED, 3);
-                }
-                else
-                {
-                    RemoterFeedback(REMOTER_LED_RED, 5);
-                }
-            }
-            break;
-
-        case KEY_EVENT_OFFSET_UP_SHORT:
-            RemoterData.OffSet_Pit += REMOTER_TRIM_STEP;
-            RemoterFeedback(REMOTER_LED_RED, 1);
-            break;
-
-        case KEY_EVENT_OFFSET_DOWN_SHORT:
-            RemoterData.OffSet_Pit -= REMOTER_TRIM_STEP;
-            RemoterFeedback(REMOTER_LED_RED, 1);
-            break;
-
-        case KEY_EVENT_OFFSET_LEFT_SHORT:
-            RemoterData.OffSet_Rol += REMOTER_TRIM_STEP;
-            RemoterFeedback(REMOTER_LED_RED, 1);
-            break;
-
-        case KEY_EVENT_OFFSET_RIGHT_SHORT:
-            RemoterData.OffSet_Rol -= REMOTER_TRIM_STEP;
-            RemoterFeedback(REMOTER_LED_RED, 1);
-            break;
-
-        default:
-            break;
-    }
-}
-
+/*
+ * 摇杆扫描任务。
+ * 启动时初始化 ADC + DMA + Flash 校准读取；
+ * 之后每 20ms 更新一次 THR/YAW/PIT/ROL 和遥控器电量。
+ */
 void vTaskStickScan(void *paramters)
 {
     (void)paramters;
@@ -197,26 +37,29 @@ void vTaskStickScan(void *paramters)
 
     while (1)
     {
-        RemoterStickUpdate();
+        RemoterStick_Update();
         vTaskDelay(pdMS_TO_TICKS(REMOTER_STICK_SCAN_PERIOD_MS));
     }
 }
 
+/*
+ * 按键处理任务。
+ * 每 20ms 扫描一次按键事件, 并触发窗口切换、校准、微调等逻辑。
+ */
 void vTaskKeyProcess(void *paramters)
 {
     (void)paramters;
 
-    Key_Init();
-    LED_Init();
-    Buzzer_Init();
+    RemoterKey_Init();
 
     while (1)
     {
-        RemoterKeyProcess(Key_ScanEvent());
+        RemoterKey_Update();
         vTaskDelay(pdMS_TO_TICKS(REMOTER_KEY_SCAN_PERIOD_MS));
     }
 }
 
+/* 串口日志发送任务: 从队列中取字符串并通过 Serial1 发出。 */
 void vTaskSerial1SendLogCode(void *pvParameters)
 {
     char pvBuffer[uxQueueSerial1ItemSize];
@@ -231,6 +74,7 @@ void vTaskSerial1SendLogCode(void *pvParameters)
     }
 }
 
+/* OLED 显示任务: 周期刷新当前窗口。 */
 void vTaskOLEDShow(void *paramters)
 {
     (void)paramters;
@@ -244,6 +88,11 @@ void vTaskOLEDShow(void *paramters)
     }
 }
 
+/*
+ * 遥控器任务创建入口。
+ * main() 只创建 RemoterCreateTask；本函数再统一创建串口、OLED、按键、摇杆扫描等子任务。
+ * 创建完成后删除自身, 节省任务控制块和栈空间。
+ */
 void RemoterCreateTask(void *paramters)
 {
     (void)paramters;

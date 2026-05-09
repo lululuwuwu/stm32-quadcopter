@@ -2,6 +2,7 @@
 #include "FreeRTOS.h"
 #include "task.h"
 #include "key.h"
+#include "stdio.h"
 
 #define KEY_DEBOUNCE_COUNT 2
 #define KEY_LONG_PRESS_TIME pdMS_TO_TICKS(1000)

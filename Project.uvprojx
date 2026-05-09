@@ -666,6 +666,26 @@
               <FilePath>.\Remoter\remoterData.h</FilePath>
             </File>
             <File>
+              <FileName>remoterstick.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\Remoter\remoterstick.c</FilePath>
+            </File>
+            <File>
+              <FileName>remoterstick.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\Remoter\remoterstick.h</FilePath>
+            </File>
+            <File>
+              <FileName>remoterkey.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\Remoter\remoterkey.c</FilePath>
+            </File>
+            <File>
+              <FileName>remoterkey.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\Remoter\remoterkey.h</FilePath>
+            </File>
+            <File>
               <FileName>show.c</FileName>
               <FileType>1</FileType>
               <FilePath>.\Remoter\show.c</FilePath>
