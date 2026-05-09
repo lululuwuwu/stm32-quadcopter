@@ -3,37 +3,6 @@
 
 #include "stm32f10x.h"
 
-// NRF24L01 ----引脚定义
-#ifndef NRF24L01_CSN_GPIO
-#define NRF24L01_CSN_GPIO GPIOA
-#define NRF24L01_CSN_PIN GPIO_Pin_4
-#endif
-
-#ifndef NRF24L01_CE_GPIO
-#define NRF24L01_CE_GPIO GPIOA
-#define NRF24L01_CE_PIN GPIO_Pin_15
-#endif
-
-#ifndef NRF24L01_MOSI_GPIO
-#define NRF24L01_MOSI_GPIO GPIOA
-#define NRF24L01_MOSI_PIN GPIO_Pin_7
-#endif
-
-#ifndef NRF24L01_SCK_GPIO
-#define NRF24L01_SCK_GPIO GPIOA
-#define NRF24L01_SCK_PIN GPIO_Pin_5
-#endif
-
-#ifndef NRF24L01_IRQ_GPIO
-#define NRF24L01_IRQ_GPIO GPIOA
-#define NRF24L01_IRQ_PIN GPIO_Pin_8
-#endif
-
-#ifndef NRF24L01_MISO_GPIO
-#define NRF24L01_MISO_GPIO GPIOA
-#define NRF24L01_MISO_PIN GPIO_Pin_6
-#endif
-
 #define NRF_MODEL_RX 1 // 接收模式，用于双向传输
 #define NRF_MODEL_TX 0 // 发送模式，用于双向传输
 

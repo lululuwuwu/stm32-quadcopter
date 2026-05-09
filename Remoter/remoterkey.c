@@ -1,4 +1,9 @@
 #include "board.h"
+#include "task.h"
+#include "buzzer.h"
+#include "key.h"
+#include "led.h"
+#include "remoterData.h"
 #include "remoterkey.h"
 #include "remoterstick.h"
 

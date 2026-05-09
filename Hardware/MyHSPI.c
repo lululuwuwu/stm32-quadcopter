@@ -1,5 +1,5 @@
+#include "board.h"
 #include "MyHSPI.h"
-
 // 使用硬件 SPI1 驱动 NRF24L01。
 // CSN：PA4，由 MyHSPI_Start/Stop 控制，低电平选中模块。
 // CE ：PA15，普通推挽输出，高电平进入收发工作状态。
@@ -23,7 +23,7 @@ void MyHSPI_Init(void)
     GPIO_InitTypeDef GPIO_InitTypeStructure;
     SPI_InitTypeDef SPI_InitTypeStructure;
 
-    RCC_APB2PeriphClockCmd(RCC_APB2Periph_AFIO | RCC_APB2Periph_GPIOA | RCC_APB2Periph_SPI1, ENABLE);
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_AFIO | NRF24L01_RCC | NRF24L01_SPI_RCC, ENABLE);
 
     /*
      * PA15 默认是 JTAG 的 JTDI 引脚。关闭 JTAG 后 PA15 才能作为普通 GPIO 使用，
@@ -35,19 +35,19 @@ void MyHSPI_Init(void)
     GPIO_InitTypeStructure.GPIO_Mode = GPIO_Mode_Out_PP;
     GPIO_InitTypeStructure.GPIO_Pin = NRF24L01_CSN_PIN | NRF24L01_CE_PIN;
     GPIO_InitTypeStructure.GPIO_Speed = GPIO_Speed_50MHz;
-    GPIO_Init(GPIOA, &GPIO_InitTypeStructure);
+    GPIO_Init(NRF24L01_CSN_GPIO, &GPIO_InitTypeStructure);
 
     // SCK 和 MOSI 使用 SPI1 复用推挽输出。
     GPIO_InitTypeStructure.GPIO_Mode = GPIO_Mode_AF_PP;
     GPIO_InitTypeStructure.GPIO_Pin = NRF24L01_SCK_PIN | NRF24L01_MOSI_PIN;
     GPIO_InitTypeStructure.GPIO_Speed = GPIO_Speed_50MHz;
-    GPIO_Init(GPIOA, &GPIO_InitTypeStructure);
+    GPIO_Init(NRF24L01_SCK_GPIO, &GPIO_InitTypeStructure);
 
     // MISO 和 IRQ 使用上拉输入。
     GPIO_InitTypeStructure.GPIO_Mode = GPIO_Mode_IPU;
     GPIO_InitTypeStructure.GPIO_Pin = NRF24L01_MISO_PIN | NRF24L01_IRQ_PIN;
     GPIO_InitTypeStructure.GPIO_Speed = GPIO_Speed_50MHz;
-    GPIO_Init(GPIOA, &GPIO_InitTypeStructure);
+    GPIO_Init(NRF24L01_MISO_GPIO, &GPIO_InitTypeStructure);
 
     // NRF24L01 支持 SPI 模式 0：CPOL=0，CPHA=0。
     SPI_InitTypeStructure.SPI_BaudRatePrescaler = SPI_BaudRatePrescaler_2;

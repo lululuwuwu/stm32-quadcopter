@@ -1,4 +1,4 @@
-#include "stm32f10x.h"
+#include "board.h"
 #include "led.h"
 
 void LED_Init(void)

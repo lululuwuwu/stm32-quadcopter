@@ -1,4 +1,6 @@
 #include "board.h"
+#include "MyADC.h"
+#include "remoterData.h"
 #include "remoterstick.h"
 
 #define REMOTER_RC_MIN 1000

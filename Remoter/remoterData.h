@@ -1,11 +1,10 @@
 #ifndef __REMOTERDATA_H
 #define __REMOTERDATA_H
 
-#include "board.h" // Device header
+#include "stm32f10x.h"
 
 typedef struct
 {
-
     u8 windows;        // 第几个窗口（0,1,2,3）
     u8 NRF_Connect;    // NRFL01 连接: 1成功 0失败
     u8 NRF_Channel;    // 信道号（1-125）
@@ -21,9 +20,9 @@ typedef struct
 
     /**
      *  BIT0:MPU 5060
-     * 	BIT1:气压
-     * 	BIT2:无线模块
-     * 	BIT3：光流模块
+     *  BIT1:气压
+     *  BIT2:无线模块
+     *  BIT3：光流模块
      */
 
     int16_t THR; // 遥杆--油门 （1000 ~ 2000）
@@ -37,10 +36,6 @@ typedef struct
 
 } RemoterDataTypeDef;
 
-
-
 extern RemoterDataTypeDef RemoterData;
-
-
 
 #endif

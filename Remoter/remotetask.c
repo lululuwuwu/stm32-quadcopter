@@ -1,4 +1,14 @@
 #include "board.h"
+#include <string.h>
+#include "task.h"
+#include "Serial1.h"
+#include "MyADC.h"
+#include "remotetask.h"
+#include "remoterData.h"
+#include "remoterstick.h"
+#include "remoterkey.h"
+#include "show.h"
+#include "NRF24L01.h"
 
 #define REMOTER_KEY_SCAN_PERIOD_MS 20
 #define REMOTER_STICK_SCAN_PERIOD_MS 20

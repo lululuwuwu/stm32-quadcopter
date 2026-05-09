@@ -1,3 +1,4 @@
+#include "board.h"
 #include "MyADC.h"
 #include "MyFLASH.h"
 #include <string.h>

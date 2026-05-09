@@ -1,5 +1,10 @@
 #include "board.h"
+#include <string.h>
+#include "task.h"
+#include "MyHSPI.h"
+#include "Serial1.h"
 #include "NRF24L01.h"
+#include "remoterData.h"
 
 /*
  * NRF24L01 无线模块驱动说明

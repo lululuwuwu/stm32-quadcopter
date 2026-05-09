@@ -1,4 +1,8 @@
-#include "board.h"
+#include "stm32f10x.h"
+#include <stdio.h>
+#include "OLED.h"
+#include "remoterData.h"
+#include "show.h"
 
 // OLED 一共提供 4 个窗口, 通过 RemoterData.windows 选择显示哪一个。
 #define SHOW_WINDOW_COUNT 4

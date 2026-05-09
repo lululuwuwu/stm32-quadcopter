@@ -1,5 +1,7 @@
 #include "board.h"
-
+#include <stdio.h>
+#include <stdarg.h>
+#include "Serial1.h"
 
 //硬件：UART1： Tx-- PA9 ,RX-PA10
 
@@ -10,7 +12,7 @@ void Serial1_Init(void)
 {
 	//1.开启时钟
 	RCC_APB2PeriphClockCmd(RCC_APB2Periph_USART1,ENABLE);
-	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA,ENABLE);
+	RCC_APB2PeriphClockCmd(Serial1_RCC,ENABLE);
 	
 	GPIO_InitTypeDef GPIO_InitTypeStructure;
 	GPIO_InitTypeStructure.GPIO_Mode = GPIO_Mode_AF_PP; //模式：推挽复用输出
@@ -177,4 +179,3 @@ void USART1_IRQHandler(void)
 
 	
 }
-
