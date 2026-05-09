@@ -12,6 +12,7 @@
 
 #include "Serial1.h"
 #include "MyADC.h"
+#include "MyHSPI.h"
 #include "key.h"
 #include "led.h"
 #include "buzzer.h"
@@ -20,6 +21,7 @@
 #include "remoterstick.h"
 #include "remoterkey.h"
 #include "show.h"
+#include "NRF24L01.h"
 
 #include "OLED.h"
 

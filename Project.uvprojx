@@ -450,6 +450,16 @@
               <FileType>5</FileType>
               <FilePath>.\Hardware\MyFLASH.h</FilePath>
             </File>
+            <File>
+              <FileName>MyHSPI.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\Hardware\MyHSPI.c</FilePath>
+            </File>
+            <File>
+              <FileName>MyHSPI.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\Hardware\MyHSPI.h</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -704,6 +714,16 @@
               <FileName>remotetask.h</FileName>
               <FileType>5</FileType>
               <FilePath>.\Remoter\remotetask.h</FilePath>
+            </File>
+            <File>
+              <FileName>NRF24L01.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\Remoter\NRF24L01.c</FilePath>
+            </File>
+            <File>
+              <FileName>NRF24L01.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\Remoter\NRF24L01.h</FilePath>
             </File>
           </Files>
         </Group>

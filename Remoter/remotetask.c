@@ -2,6 +2,7 @@
 
 #define REMOTER_KEY_SCAN_PERIOD_MS 20
 #define REMOTER_STICK_SCAN_PERIOD_MS 20
+#define REMOTER_NRF24L01_PERIOD_MS 20
 #define REMOTER_RC_MIN 1000
 #define REMOTER_RC_CENTER 1500
 
@@ -10,6 +11,7 @@
  * 创建任务前先给遥控数据安全默认值：
  *   THR 油门最低 1000, 避免上电瞬间误给油；
  *   YAW/PIT/ROL 回中 1500；
+ *   NRF 默认信道 28；
  *   其他字段清零。
  */
 static void RemoterDataInit(void)
@@ -89,8 +91,25 @@ void vTaskOLEDShow(void *paramters)
 }
 
 /*
+ * NRF24L01 无线收发任务。
+ * 遥控器侧作为 PTX 主动发送遥控数据；飞行器侧可通过 ACK payload 回传电量、姿态、传感器状态。
+ */
+void vTaskNRF24L01Process(void *paramters)
+{
+    (void)paramters;
+
+    NRF24L01_Init(NRF_MODEL_TX, RemoterData.NRF_Channel);
+
+    while (1)
+    {
+        NRF24L01_RemoterUpdate();
+        vTaskDelay(pdMS_TO_TICKS(REMOTER_NRF24L01_PERIOD_MS));
+    }
+}
+
+/*
  * 遥控器任务创建入口。
- * main() 只创建 RemoterCreateTask；本函数再统一创建串口、OLED、按键、摇杆扫描等子任务。
+ * main() 只创建 RemoterCreateTask；本函数再统一创建串口、OLED、按键、摇杆扫描、无线收发等子任务。
  * 创建完成后删除自身, 节省任务控制块和栈空间。
  */
 void RemoterCreateTask(void *paramters)
@@ -106,6 +125,7 @@ void RemoterCreateTask(void *paramters)
     xTaskCreate(vTaskOLEDShow, "TaskOLEDShow", 256, NULL, 1, NULL);
     xTaskCreate(vTaskKeyProcess, "TaskKeyProcess", 128, NULL, 2, NULL);
     xTaskCreate(vTaskStickScan, "TaskStickScan", 128, NULL, 2, NULL);
+    xTaskCreate(vTaskNRF24L01Process, "TaskNRF24L01", 256, NULL, 2, NULL);
 
     taskEXIT_CRITICAL();
 
