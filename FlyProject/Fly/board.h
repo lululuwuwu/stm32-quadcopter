@@ -11,6 +11,8 @@
 
 #include "MyPWM.h"
 #include "FlyContrl.h"
+#include "MyI2C.h"
+#include "MPU6050.h"
 
 
 
@@ -26,6 +28,12 @@
 #define Serial3_Rx_PIN GPIO_Pin_11
 #define Serial3_BaudRate 115200
 extern QueueHandle_t xQueueSerial3;
+
+/*******************************MPU6050 软件 IIC 通讯引脚定义 */
+#define MPU6050_RCC RCC_APB2Periph_GPIOB
+#define MPU6050_GPIO GPIOB
+#define MPU6050_SCL_Pin GPIO_Pin_6
+#define MPU6050_SDA_Pin GPIO_Pin_7
 
 /*******************************LED灯定义 */
 #define LED_RCC RCC_APB2Periph_GPIOB
