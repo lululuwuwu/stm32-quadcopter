@@ -1,151 +1,152 @@
+/*
+ * 文件名: Serial3.c
+ * 功能说明:
+ * 1. Serial3_Init          初始化 USART3，硬件连接为 PB10=TX、PB11=RX。
+ * 2. Serial3_SendByte      等待 TXE 置位后发送 1 字节。
+ * 3. Serial3_SendArray     逐字节发送数组。
+ * 4. Serial3_SendString    逐字节发送以 \0 结尾的字符串。
+ * 5. fputc                 重定向 printf 到 USART3。
+ * 6. Serial3_SendLog       使用 vsnprintf 格式化日志，并投递到 FreeRTOS 队列。
+ * 7. Serial3_GetRxStatus   查询串口接收是否完成一行。
+ * 8. Serial3_GetRxString   返回接收缓冲区并复位接收状态。
+ * 9. USART3_IRQHandler     USART3 接收中断，按换行符结束一帧字符串。
+ *
+ * 注意:
+ * - 日志发送采用队列，真正的串口发送在 TaskSerial3 中执行，避免业务任务长时间阻塞。
+ * - Serial3_SendLog 当前投递队列等待时间为 0，高频打印时可能丢日志，但不会拖慢控制任务。
+ */
 #include "board.h"
+#include "stdio.h"
+#include <stdarg.h>
 
-// 硬件： UART3： Tx - PB10 ,Rx - PB11
+uint8_t Serial3_RxByte = 0x00;
+char Serial3_RxString[256];
+uint16_t Serial3_RxIndex = 0;
+uint8_t Serial3_RxComplate = 0;
 
 void Serial3_Init(void)
 {
-    // 开启时钟
+    GPIO_InitTypeDef GPIO_InitTypeStructure;
+    USART_InitTypeDef USART_InitTypeStructure;
+    NVIC_InitTypeDef NVIC_InitTypeStructure;
+
+    // 1. 打开 USART3 所在 APB1 时钟和 GPIOB 所在 APB2 时钟。
     RCC_APB2PeriphClockCmd(Serial3_RCC_GPIO, ENABLE);
     RCC_APB1PeriphClockCmd(Serial3_RCC_UART, ENABLE);
 
-    // 配置GPIO
-    GPIO_InitTypeDef GPIO_InitTypeStructure;
-    GPIO_InitTypeStructure.GPIO_Mode  = GPIO_Mode_AF_PP; // PB10 是串口的输出 Tx ---> 推挽复用输出
-    GPIO_InitTypeStructure.GPIO_Pin   = Serial3_Tx_PIN;
+    // 2. PB10 是 USART3_TX，配置为复用推挽输出。
+    GPIO_InitTypeStructure.GPIO_Mode = GPIO_Mode_AF_PP;
+    GPIO_InitTypeStructure.GPIO_Pin = Serial3_Tx_PIN;
     GPIO_InitTypeStructure.GPIO_Speed = GPIO_Speed_50MHz;
     GPIO_Init(Serial3_GPIO, &GPIO_InitTypeStructure);
 
-    GPIO_InitTypeStructure.GPIO_Mode = GPIO_Mode_IPU; // PB11 是串口的输入 Rx --->  浮空输入或带上拉输入
-    GPIO_InitTypeStructure.GPIO_Pin  = Serial3_Rx_PIN;
+    // 3. PB11 是 USART3_RX，配置为上拉输入，空闲状态保持高电平。
+    GPIO_InitTypeStructure.GPIO_Mode = GPIO_Mode_IPU;
+    GPIO_InitTypeStructure.GPIO_Pin = Serial3_Rx_PIN;
     GPIO_Init(Serial3_GPIO, &GPIO_InitTypeStructure);
 
-    // 串口配置
-
-    USART_InitTypeDef USART_InitTypeStructure;
-    USART_InitTypeStructure.USART_BaudRate            = Serial3_BaudRate;               // 直接填写波特率即可
-    USART_InitTypeStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None; // 不用硬件流控
-    USART_InitTypeStructure.USART_Mode                = USART_Mode_Tx | USART_Mode_Rx;  // 发送模式 和 接收模式
-    USART_InitTypeStructure.USART_Parity              = USART_Parity_No;                // 不用校验位（奇 ， 偶 校验）
-    USART_InitTypeStructure.USART_StopBits            = USART_StopBits_1;               // 1个停止位
-    USART_InitTypeStructure.USART_WordLength          = USART_WordLength_8b;            // 8位数据长度
-
+    // 4. USART3 配置为 115200 8N1，无硬件流控，同时开启收发。
+    USART_InitTypeStructure.USART_BaudRate = Serial3_BaudRate;
+    USART_InitTypeStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
+    USART_InitTypeStructure.USART_Mode = USART_Mode_Tx | USART_Mode_Rx;
+    USART_InitTypeStructure.USART_Parity = USART_Parity_No;
+    USART_InitTypeStructure.USART_StopBits = USART_StopBits_1;
+    USART_InitTypeStructure.USART_WordLength = USART_WordLength_8b;
     USART_Init(Serial3_Type, &USART_InitTypeStructure);
 
-    // 用中断来控制接收
+    // 5. 开启接收非空中断，用于接收上位机发来的字符串命令。
     USART_ITConfig(Serial3_Type, USART_IT_RXNE, ENABLE);
 
-    // NVIC
-    NVIC_InitTypeDef NVIC_InitTypeStructure;
-    NVIC_InitTypeStructure.NVIC_IRQChannel                   = USART3_IRQn;
-    NVIC_InitTypeStructure.NVIC_IRQChannelCmd                = ENABLE;
+    // 6. 配置 USART3 中断优先级。当前未在 ISR 中调用 FreeRTOS API，因此优先级只需避开系统关键中断。
+    NVIC_InitTypeStructure.NVIC_IRQChannel = USART3_IRQn;
+    NVIC_InitTypeStructure.NVIC_IRQChannelCmd = ENABLE;
     NVIC_InitTypeStructure.NVIC_IRQChannelPreemptionPriority = 2;
-    NVIC_InitTypeStructure.NVIC_IRQChannelSubPriority        = 0;
-
+    NVIC_InitTypeStructure.NVIC_IRQChannelSubPriority = 0;
     NVIC_Init(&NVIC_InitTypeStructure);
 
-    // 串口使能
     USART_Cmd(Serial3_Type, ENABLE);
 }
 
-// 发送字节数据
 void Serial3_SendByte(uint8_t byteValue)
 {
-    /*
-    位7
-    TXE:发送数据寄存器空 (Transmit data register empty)
-    当TDR寄存器中的数据被硬件转移到移位寄存器的时候，该位被硬件置位。如果USART_CR1
-    寄存器中的TXEIE为1，则产生中断。对USART_DR的写操作，将该位清零。
-    0：数据还没有被转移到移位寄存器；
-    1：数据已经被转移到移位寄存器。
-    注意：单缓冲器传输中使用该位
-    */
+    // TXE=1 表示发送数据寄存器空，可以写入下一个字节。
     while (USART_GetFlagStatus(Serial3_Type, USART_FLAG_TXE) != SET)
         ;
 
     USART_SendData(Serial3_Type, byteValue);
 }
 
-// 发送数组
-void Serial3_SendArray(uint8_t* arrayAddr, uint8_t length)
+void Serial3_SendArray(uint8_t *arrayAddr, uint8_t length)
 {
-    for (uint8_t i = 0; i < length; i++)
+    uint8_t i;
+
+    for (i = 0; i < length; i++)
     {
         Serial3_SendByte(arrayAddr[i]);
     }
 }
 
-// 发送字符串
-void Serial3_SendString(char* str)
+void Serial3_SendString(char *str)
 {
-    for (uint8_t i = 0; str[i] != '\0'; i++)
+    uint8_t i;
+
+    for (i = 0; str[i] != '\0'; i++)
     {
         Serial3_SendByte(str[i]);
     }
 }
 
-// 希望用串口打印日志 ---> 修改printf的底层，把字节传送到串口UATR上
-
-// 重写printf底层的fputc，重定向输出到串口----> 编译到项目中即可
-int fputc(int ch, FILE* f)
+int fputc(int ch, FILE *f)
 {
-    Serial3_SendByte(ch); // 将printf的底层重定向到自己的发送字节函数
+    // 重定向 printf 的底层输出，便于临时调试。
+    Serial3_SendByte((uint8_t)ch);
     return ch;
 }
 
-// 用队列的方式打印日志   ---> Serial3_SendLog("hello %d %d",5,6)
-
-#include "stdio.h"
-#include <stdarg.h>
-void Serial3_SendLog(char* format, ...) //...表示可变参数
+void Serial3_SendLog(char *format, ...)
 {
     static char str[uxQueueSerial3ItemSize];
-    va_list     arg;                          // 定义可变参数列表数据类型的变量arg
-    va_start(arg, format);                    // 从format开始，接收参数列表到arg变量
-    vsnprintf(str, sizeof(str), format, arg); // 使用vsprintf打印格式化字符串和参数列表到字符数组中
-    va_end(arg);                              // 结束变量arg
+    va_list arg;
 
-    xQueueSendToBack(xQueueSerial3, str, 0); // portMAX_DELAY 一直等
+    // 使用固定大小缓冲区，避免 sprintf 越界破坏内存。
+    va_start(arg, format);
+    vsnprintf(str, sizeof(str), format, arg);
+    va_end(arg);
+
+    // 等待时间为 0：队列满时直接丢弃本条日志，保证高频任务不被串口拖住。
+    xQueueSendToBack(xQueueSerial3, str, 0);
 }
-
-uint8_t Serial3_RxByte = 0x00;
-
-char     Serial3_RxString[256];
-uint16_t Serial3_RxIndex    = 0; // 下标
-uint8_t  Serial3_RxComplate = 0; // 0就是没有接收完成，1就是接收完成
-
-// 获取是否接收完成标志
 
 uint8_t Serial3_GetRxStatus(void)
 {
     return Serial3_RxComplate;
 }
 
-// 读取数据
-char* Serial3_GetRxString(void)
+char *Serial3_GetRxString(void)
 {
-    Serial3_RxIndex    = 0; // 重置
-    Serial3_RxComplate = 0; // 重置
+    // 读取后复位索引和完成标志，下一帧从缓冲区起始位置重新接收。
+    Serial3_RxIndex = 0;
+    Serial3_RxComplate = 0;
     return Serial3_RxString;
 }
 
-// 接收中断处理函数
 void USART3_IRQHandler(void)
 {
     if (USART_GetITStatus(Serial3_Type, USART_IT_RXNE) == SET)
     {
-        // 常见的字符串结束符号是 \r\n  或 \n
-
         Serial3_RxByte = USART_ReceiveData(Serial3_Type);
 
+        // 未收到换行且缓冲区未满时继续保存字符。
         if (Serial3_RxIndex < 255 && Serial3_RxByte != '\r' && Serial3_RxByte != '\n' && Serial3_RxComplate != 1)
         {
             Serial3_RxString[Serial3_RxIndex++] = Serial3_RxByte;
         }
 
+        // 使用 \n 作为一帧结束符，末尾手动补 \0，方便按字符串处理。
         if (Serial3_RxByte == '\n')
         {
-            Serial3_RxString[Serial3_RxIndex++] = '\0'; // 手动加一个结束符
-            Serial3_RxComplate                  = 1;
+            Serial3_RxString[Serial3_RxIndex++] = '\0';
+            Serial3_RxComplate = 1;
         }
 
         USART_ClearITPendingBit(Serial3_Type, USART_IT_RXNE);
