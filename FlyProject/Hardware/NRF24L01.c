@@ -460,7 +460,7 @@ static uint8_t NRF24L01_BuildStatusAck(uint8_t *packet)
     NRF24L01_PutInt16(packet, 8, NRF24L01_AngleToInt16(FlyAngle.Yaw * 100.0f));
     NRF24L01_PutInt32(packet, 10, 0);
     packet[14] = 0;
-    packet[15] = 0;
+    packet[15] = FlyContrlFlag.unlock;
     packet[16] = NRF24L01_Checksum(packet, 16);
     return 17;
 }

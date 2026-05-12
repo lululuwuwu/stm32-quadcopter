@@ -15,6 +15,7 @@
 #include "board.h"
 #include "FlyAttitude.h"
 
+#define FLY_UNLOCK_PERIOD_MS 10
 #define FLY_NRF24L01_PERIOD_MS 20
 
 // 串口 3 日志队列句柄。main.c 创建队列，本文件定义句柄存储空间。
@@ -66,6 +67,17 @@ void FlyContrlMotorTask_3ms(void *pvParameters)
     }
 }
 
+void FlyUnlockTask_10ms(void *pvParameters)
+{
+    (void)pvParameters;
+
+    while (1)
+    {
+        FlyContrl_Unlock_10ms();
+        vTaskDelay(pdMS_TO_TICKS(FLY_UNLOCK_PERIOD_MS));
+    }
+}
+
 void FlyNRF24L01Task_20ms(void *pvParameters)
 {
     (void)pvParameters;
@@ -88,6 +100,7 @@ void FlyCreateTask(void *pvParameters)
     xTaskCreate(TaskSerial3, "TaskSerial3", 128, NULL, (configMAX_PRIORITIES - 1), NULL);
     xTaskCreate(LEDTask, "LEDTask", 128, NULL, 1, NULL);
     xTaskCreate(FlyContrlMotorTask_3ms, "FlyContrlMotorTask_3ms", 128, NULL, 2, NULL);
+    xTaskCreate(FlyUnlockTask_10ms, "FlyUnlockTask_10ms", 128, NULL, 2, NULL);
     xTaskCreate(FlyAttitudeTask_20ms, "MPU6050Task", 256, NULL, 1, NULL);
     xTaskCreate(FlyNRF24L01Task_20ms, "NRF24L01Task", 256, NULL, 2, NULL);
 

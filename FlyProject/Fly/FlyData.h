@@ -55,8 +55,15 @@ typedef struct
     int16_t MAG_Z;         /* 当前无磁力计，回传时暂填 0 */
     uint16_t BatteryMv;    /* 飞控电压，单位 mV；未接入 ADC 时为 0 */
 } _st_FlySensor;
+
+typedef struct
+{
+    uint8_t unlock;         /* 1 表示允许电机输出，0 表示锁定并强制电机停转 */
+} _st_FlyContrlFlag;
+
 extern _st_Angle FlyAngle;
 extern _st_RemoterControl FlyRemoter;
 extern _st_FlySensor FlySensor;
+extern _st_FlyContrlFlag FlyContrlFlag;
 
 #endif

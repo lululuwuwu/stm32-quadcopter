@@ -32,3 +32,6 @@ _st_RemoterControl FlyRemoter = {
 
 // 飞控回传用的传感器快照。电压 ADC 尚未接入时 BatteryMv 保持 0。
 _st_FlySensor FlySensor = {0};
+
+// 上电默认保持锁定，必须完成油门低-高-低流程后才允许电机输出。
+_st_FlyContrlFlag FlyContrlFlag = {0};
