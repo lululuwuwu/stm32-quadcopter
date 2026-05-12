@@ -50,7 +50,8 @@ void MyHSPI_Init(void)
     GPIO_Init(NRF24L01_MISO_GPIO, &GPIO_InitTypeStructure);
 
     // NRF24L01 支持 SPI 模式 0：CPOL=0，CPHA=0。
-    SPI_InitTypeStructure.SPI_BaudRatePrescaler = SPI_BaudRatePrescaler_2;
+    // SPI1 挂在 72MHz APB2 上，/8 后约 9MHz，避免超过 NRF24L01 约 10MHz 的 SPI 时钟上限。
+    SPI_InitTypeStructure.SPI_BaudRatePrescaler = SPI_BaudRatePrescaler_8;
     SPI_InitTypeStructure.SPI_CPHA = SPI_CPHA_1Edge;
     SPI_InitTypeStructure.SPI_CPOL = SPI_CPOL_Low;
     SPI_InitTypeStructure.SPI_CRCPolynomial = 7;

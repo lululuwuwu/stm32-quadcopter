@@ -3,8 +3,8 @@
 
 #include "stm32f10x.h"
 
-#define NRF_MODEL_RX 1 // 接收模式，用于双向传输
-#define NRF_MODEL_TX 0 // 发送模式，用于双向传输
+#define NRF_MODEL_RX 1 // 接收模式，用于飞行器等待遥控器数据
+#define NRF_MODEL_TX 0 // 发送模式，用于遥控器主动发送数据
 
 //***************************************NRF24L01寄存器指令*******************************************************
 #define NRF_READ_REG 0x00           // 读寄存器指令
@@ -63,6 +63,11 @@
 #define NRF_FLY_RCDATA_ACK_PAYLOAD_LENGTH 25
 #define NRF_FLY_POWER_ACK_PAYLOAD_LENGTH 9
 
+#define NRF_FLY_TEST_FLAG_MPU6050 0x0001
+#define NRF_FLY_TEST_FLAG_BARO 0x0002
+#define NRF_FLY_TEST_FLAG_NRF24L01 0x0004
+#define NRF_FLY_TEST_FLAG_FLOW 0x0008
+
 extern uint8_t NRF_RX_DATA[];
 extern uint8_t NRF_TX_DATA[];
 
@@ -70,6 +75,6 @@ void NRF24L01_Init(uint8_t mode, uint8_t chanle);
 uint8_t NRF24L01_TX(uint8_t *txBuffer, uint8_t length);
 uint8_t NRF24L01_RX(void);
 uint8_t NRF24L01_GetLastAckLength(void);
-void NRF24L01_RemoterUpdate(void);
+void NRF24L01_FlyUpdate(void);
 
 #endif

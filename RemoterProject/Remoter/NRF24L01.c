@@ -20,7 +20,7 @@
  *
  * 当前遥控器侧的工作方式：
  *   - 遥控器初始化为 PTX 发送模式。
- *   - 周期性发送 20 字节遥控数据包。
+ *   - 周期性发送 25 字节 RCDATA 遥控数据包。
  *   - 飞行器如果在 ACK payload 里返回 17 字节状态包，本文件会解析后写入 RemoterData。
  */
 
@@ -33,12 +33,19 @@
 #define NRF_TX_PLOAD_WIDTH 32
 
 /* 遥控器发给飞行器的数据包标记，以及飞行器 ACK 回传数据包标记。 */
-#define NRF_REMOTER_PACKET_MAGIC 0xA5
-#define NRF_FLY_ACK_PACKET_MAGIC 0x5A
-#define NRF_PACKET_VERSION 1
-
-/* 飞行器 ACK flags 字段定义。 */
-#define NRF_ACK_FLAG_FLY_LOW_POWER 0x01
+#define NRF_REMOTER_FRAME_HEAD_0 0xAA
+#define NRF_REMOTER_FRAME_HEAD_1 0xAF
+#define NRF_FLY_FRAME_HEAD_0 0xAA
+#define NRF_FLY_FRAME_HEAD_1 0xAA
+#define NRF_FRAME_ID_STATUS 0x01
+#define NRF_FRAME_ID_SENSOR 0x02
+#define NRF_FRAME_ID_RCDATA 0x03
+#define NRF_FRAME_ID_POWER 0x05
+#define NRF_FLY_STATUS_DATA_LENGTH 12
+#define NRF_FLY_SENSOR_DATA_LENGTH 18
+#define NRF_FLY_RCDATA_DATA_LENGTH 20
+#define NRF_FLY_POWER_DATA_LENGTH 4
+#define NRF_REMOTER_RCDATA_DATA_LENGTH 20
 
 /*
  * 本机发送地址和接收地址。
@@ -47,8 +54,8 @@
  * 适合一对一遥控器和飞行器通信。后续如果要支持多个飞机或对频，
  * 可以把地址和信道做成可配置参数。
  */
-uint8_t NRF_TX_ADDRESS[NRF_TX_ADR_WIDTH] = {0xA1, 0xA2, 0xA3, 0x02, 0x01};
-uint8_t NRF_RX_ADDRESS[NRF_RX_ADR_WIDTH] = {0xA1, 0xA2, 0xA3, 0x02, 0x01};
+uint8_t NRF_TX_ADDRESS[NRF_TX_ADR_WIDTH] = {0xA1, 0xA2, 0xA3, 0x01, 0x02};
+uint8_t NRF_RX_ADDRESS[NRF_RX_ADR_WIDTH] = {0xA1, 0xA2, 0xA3, 0x01, 0x02};
 
 /* 接收和发送缓存。 */
 uint8_t NRF_RX_DATA[NRF_RX_PLOAD_WIDTH];
@@ -155,83 +162,197 @@ static uint16_t NRF24L01_GetUInt16(const uint8_t *buffer, uint8_t index)
     return (uint16_t)((uint16_t)buffer[index] | ((uint16_t)buffer[index + 1] << 8));
 }
 
+static int32_t NRF24L01_GetInt32(const uint8_t *buffer, uint8_t index)
+{
+    return (int32_t)((uint32_t)buffer[index] |
+                     ((uint32_t)buffer[index + 1] << 8) |
+                     ((uint32_t)buffer[index + 2] << 16) |
+                     ((uint32_t)buffer[index + 3] << 24));
+}
+
 /*
- * 把当前 RemoterData 打包成 20 字节遥控数据。
+ * 把当前 RemoterData 打包成 Excel 协议中的 25 字节 RCDATA 遥控数据。
  *
  * 包格式：
- *   [0]    magic = 0xA5
- *   [1]    version = 1
- *   [2]    flags，bit0 表示遥控器低电量
- *   [3]    当前 OLED 窗口号
- *   [4]    NRF 信道号
- *   [5:12] THR/YAW/PIT/ROL，int16 小端
- *   [13:18] OffSet_Pit/OffSet_Rol/OffSet_Yaw，int16 小端
- *   [19]   前 19 字节校验和
+ *   [0:1]  帧头 = 0xAA 0xAF
+ *   [2]    功能字 = 0x03
+ *   [3]    数据长度 = 20
+ *   [4:23] THR/YAW/ROL/PIT/AUX1~AUX6，10 个 int16 小端
+ *   [24]   前 24 字节校验和
  */
 static void NRF24L01_BuildRemoterPacket(uint8_t *packet)
 {
     memset(packet, 0, NRF_REMOTER_TX_PAYLOAD_LENGTH);
 
-    packet[0] = NRF_REMOTER_PACKET_MAGIC;
-    packet[1] = NRF_PACKET_VERSION;
-    packet[2] = RemoterData.RC_low_power ? 0x01 : 0x00;
-    packet[3] = RemoterData.windows;
-    packet[4] = RemoterData.NRF_Channel;
+    packet[0] = NRF_REMOTER_FRAME_HEAD_0;
+    packet[1] = NRF_REMOTER_FRAME_HEAD_1;
+    packet[2] = NRF_FRAME_ID_RCDATA;
+    packet[3] = NRF_REMOTER_RCDATA_DATA_LENGTH;
 
-    NRF24L01_PutInt16(packet, 5, RemoterData.THR);
-    NRF24L01_PutInt16(packet, 7, RemoterData.YAW);
-    NRF24L01_PutInt16(packet, 9, RemoterData.PIT);
-    NRF24L01_PutInt16(packet, 11, RemoterData.ROL);
-    NRF24L01_PutInt16(packet, 13, RemoterData.OffSet_Pit);
-    NRF24L01_PutInt16(packet, 15, RemoterData.OffSet_Rol);
-    NRF24L01_PutInt16(packet, 17, RemoterData.OffSet_Yaw);
+    NRF24L01_PutInt16(packet, 4, RemoterData.THR);
+    NRF24L01_PutInt16(packet, 6, RemoterData.YAW);
+    NRF24L01_PutInt16(packet, 8, RemoterData.ROL);
+    NRF24L01_PutInt16(packet, 10, RemoterData.PIT);
+    NRF24L01_PutInt16(packet, 12, RemoterData.OffSet_Pit);
+    NRF24L01_PutInt16(packet, 14, RemoterData.OffSet_Rol);
+    NRF24L01_PutInt16(packet, 16, RemoterData.OffSet_Yaw);
+    NRF24L01_PutInt16(packet, 18, RemoterData.windows);
+    NRF24L01_PutInt16(packet, 20, RemoterData.RC_low_power ? 1 : 0);
+    NRF24L01_PutInt16(packet, 22, RemoterData.NRF_Channel);
 
-    packet[19] = NRF24L01_Checksum(packet, 19);
+    packet[24] = NRF24L01_Checksum(packet, 24);
+}
+static void NRF24L01_MarkFlyAckOk(void)
+{
+    RemoterData.fly_test_flag |= (1 << 2);
+
+    if (RemoterData.NRF_RSSI_count <= 245)
+    {
+        RemoterData.NRF_RSSI_count += 5;
+    }
+    else
+    {
+        RemoterData.NRF_RSSI_count = 250;
+    }
 }
 
-/*
- * 解析飞行器通过 ACK payload 返回的 17 字节状态包。
- *
- * 包格式：
- *   [0]     magic = 0x5A
- *   [1]     version = 1
- *   [2]     flags，bit0 表示飞行器低电量
- *   [3]     RSSI/链路质量计数，0~250，由飞行器侧定义
- *   [4:5]   Battery_Fly，uint16，小端，单位 mV
- *   [6:13]  X/Y/Z/H，int16 小端
- *   [14:15] fly_test_flag，uint16 小端
- *   [16]    前 16 字节校验和
- */
-static uint8_t NRF24L01_ParseFlyAck(const uint8_t *packet, uint8_t length)
+static uint8_t NRF24L01_CheckFlyAckFrame(const uint8_t *packet, uint8_t length, uint8_t func, uint8_t dataLength)
 {
-    if (length < NRF_FLY_ACK_PAYLOAD_LENGTH)
+    uint8_t frameLength;
+
+    frameLength = (uint8_t)(dataLength + 5);
+    if (length < frameLength)
     {
         return 0;
     }
 
-    if (packet[0] != NRF_FLY_ACK_PACKET_MAGIC || packet[1] != NRF_PACKET_VERSION)
+    if (packet[0] != NRF_FLY_FRAME_HEAD_0 || packet[1] != NRF_FLY_FRAME_HEAD_1 ||
+        packet[2] != func || packet[3] != dataLength)
     {
         return 0;
     }
 
-    if (packet[16] != NRF24L01_Checksum(packet, 16))
+    if (packet[frameLength - 1] != NRF24L01_Checksum(packet, frameLength - 1))
     {
         return 0;
     }
-
-    RemoterData.Fly_low_power = (packet[2] & NRF_ACK_FLAG_FLY_LOW_POWER) ? 1 : 0;
-    RemoterData.NRF_RSSI_count = packet[3];
-    RemoterData.Battery_Fly = NRF24L01_GetUInt16(packet, 4);
-    RemoterData.X = NRF24L01_GetInt16(packet, 6);
-    RemoterData.Y = NRF24L01_GetInt16(packet, 8);
-    RemoterData.Z = NRF24L01_GetInt16(packet, 10);
-    RemoterData.H = NRF24L01_GetInt16(packet, 12);
-    RemoterData.fly_test_flag = NRF24L01_GetUInt16(packet, 14);
 
     return 1;
 }
 
-/*
+/* 解析 01 STATUS：姿态、高度、飞行模式和解锁状态。 */
+static uint8_t NRF24L01_ParseStatusAck(const uint8_t *packet, uint8_t length)
+{
+    int16_t rollCentidegree;
+    int16_t pitchCentidegree;
+    int16_t yawCentidegree;
+
+    if (!NRF24L01_CheckFlyAckFrame(packet, length, NRF_FRAME_ID_STATUS, NRF_FLY_STATUS_DATA_LENGTH))
+    {
+        return 0;
+    }
+
+    rollCentidegree = NRF24L01_GetInt16(packet, 4);
+    pitchCentidegree = NRF24L01_GetInt16(packet, 6);
+    yawCentidegree = NRF24L01_GetInt16(packet, 8);
+
+    RemoterData.X = pitchCentidegree / 100;
+    RemoterData.Y = rollCentidegree / 100;
+    RemoterData.Z = yawCentidegree / 100;
+    RemoterData.H = (int)NRF24L01_GetInt32(packet, 10);
+
+    return 1;
+}
+
+/* 解析 02 SENSER：当前遥控器端暂不显示原始值，只用它刷新 MPU 状态位。 */
+static uint8_t NRF24L01_ParseSensorAck(const uint8_t *packet, uint8_t length)
+{
+    int16_t accX;
+    int16_t accY;
+    int16_t accZ;
+    int16_t gyroX;
+    int16_t gyroY;
+    int16_t gyroZ;
+
+    if (!NRF24L01_CheckFlyAckFrame(packet, length, NRF_FRAME_ID_SENSOR, NRF_FLY_SENSOR_DATA_LENGTH))
+    {
+        return 0;
+    }
+
+    accX = NRF24L01_GetInt16(packet, 4);
+    accY = NRF24L01_GetInt16(packet, 6);
+    accZ = NRF24L01_GetInt16(packet, 8);
+    gyroX = NRF24L01_GetInt16(packet, 10);
+    gyroY = NRF24L01_GetInt16(packet, 12);
+    gyroZ = NRF24L01_GetInt16(packet, 14);
+
+    if (accX != 0 || accY != 0 || accZ != 0 || gyroX != 0 || gyroY != 0 || gyroZ != 0)
+    {
+        RemoterData.fly_test_flag |= (1 << 0);
+    }
+    else
+    {
+        RemoterData.fly_test_flag &= (uint16_t)~(1 << 0);
+    }
+
+    return 1;
+}
+
+/* 解析 03 RCDATA：确认飞控端实际收到的控制数据格式正确。 */
+static uint8_t NRF24L01_ParseRcDataAck(const uint8_t *packet, uint8_t length)
+{
+    return NRF24L01_CheckFlyAckFrame(packet, length, NRF_FRAME_ID_RCDATA, NRF_FLY_RCDATA_DATA_LENGTH);
+}
+
+/* 解析 05 POWER：电压单位按本项目约定为 mV，电流字段当前未使用。 */
+static uint8_t NRF24L01_ParsePowerAck(const uint8_t *packet, uint8_t length)
+{
+    if (!NRF24L01_CheckFlyAckFrame(packet, length, NRF_FRAME_ID_POWER, NRF_FLY_POWER_DATA_LENGTH))
+    {
+        return 0;
+    }
+
+    RemoterData.Battery_Fly = NRF24L01_GetUInt16(packet, 4);
+    RemoterData.Fly_low_power = 0;
+
+    return 1;
+}
+
+static uint8_t NRF24L01_ParseFlyAck(const uint8_t *packet, uint8_t length)
+{
+    uint8_t result;
+
+    if (length < 5)
+    {
+        return 0;
+    }
+
+    switch (packet[2])
+    {
+        case NRF_FRAME_ID_STATUS:
+            result = NRF24L01_ParseStatusAck(packet, length);
+            break;
+        case NRF_FRAME_ID_SENSOR:
+            result = NRF24L01_ParseSensorAck(packet, length);
+            break;
+        case NRF_FRAME_ID_RCDATA:
+            result = NRF24L01_ParseRcDataAck(packet, length);
+            break;
+        case NRF_FRAME_ID_POWER:
+            result = NRF24L01_ParsePowerAck(packet, length);
+            break;
+        default:
+            result = 0;
+            break;
+    }
+
+    if (result)
+    {
+        NRF24L01_MarkFlyAckOk();
+    }
+
+    return result;
+}/*
  * 初始化 NRF24L01。
  *
  * mode:

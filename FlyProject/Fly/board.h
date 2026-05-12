@@ -4,8 +4,9 @@
  * 1. 系统头文件包含区      集中包含 STM32 标准外设库、FreeRTOS 和本项目业务模块头文件。
  * 2. 串口 3 宏定义区       定义 USART3、PB10/PB11、波特率和日志队列参数。
  * 3. MPU6050 软件 IIC 区   定义 MPU6050 使用的软件 IIC GPIO：PB6=SCL、PB7=SDA。
- * 4. LED 宏定义区          定义四个机身状态灯使用的 GPIO 和引脚。
- * 5. PWM 宏定义区          定义四路电机 PWM 使用的 TIM2/TIM3 通道和引脚。
+ * 4. NRF24L01 硬件 SPI 区  定义无线模块使用的 SPI2 和控制引脚。
+ * 5. LED 宏定义区          定义四个机身状态灯使用的 GPIO 和引脚。
+ * 6. PWM 宏定义区          定义四路电机 PWM 使用的 TIM2/TIM3 通道和引脚。
  *
  * 注意:
  * - 本文件是板级硬件资源的集中入口，新增外设引脚时优先放在这里，避免散落到多个 .c 文件。
@@ -21,11 +22,13 @@
 
 #include "Serial3.h"
 #include "FlyTask.h"
+#include "FlyAttitude.h"
 #include "LED.h"
 #include "MyPWM.h"
 #include "FlyContrl.h"
 #include "MyI2C.h"
 #include "MPU6050.h"
+#include "NRF24L01.h"
 
 /*******************************串口 3 定义 */
 #define uxQueueSerial3Length 10       // 串口日志队列最多缓存 10 条字符串
@@ -45,6 +48,29 @@ extern QueueHandle_t xQueueSerial3;
 #define MPU6050_GPIO GPIOB
 #define MPU6050_SCL_Pin GPIO_Pin_6    // 软件 IIC SCL
 #define MPU6050_SDA_Pin GPIO_Pin_7    // 软件 IIC SDA
+
+/*******************************NRF24L01 硬件 SPI 通讯引脚定义 */
+/*
+ * 实际连线: CSN PB12，SCK PB13，MISO PB14，MOSI PB15，IRQ PB2，CE PA8。
+ * PB13/PB14/PB15 是 STM32F103 的 SPI2 引脚，因此这里按硬件连线使用 SPI2。
+ */
+#define NRF24L01_SPI SPI2
+#define NRF24L01_SPI_RCC RCC_APB1Periph_SPI2
+#define NRF24L01_GPIOB_RCC RCC_APB2Periph_GPIOB
+#define NRF24L01_GPIOA_RCC RCC_APB2Periph_GPIOA
+#define NRF24L01_CSN_GPIO GPIOB
+#define NRF24L01_CSN_PIN GPIO_Pin_12
+#define NRF24L01_SCK_GPIO GPIOB
+#define NRF24L01_SCK_PIN GPIO_Pin_13
+#define NRF24L01_MISO_GPIO GPIOB
+#define NRF24L01_MISO_PIN GPIO_Pin_14
+#define NRF24L01_MOSI_GPIO GPIOB
+#define NRF24L01_MOSI_PIN GPIO_Pin_15
+#define NRF24L01_IRQ_GPIO GPIOB
+#define NRF24L01_IRQ_PIN GPIO_Pin_2
+#define NRF24L01_CE_GPIO GPIOA
+#define NRF24L01_CE_PIN GPIO_Pin_8
+#define NRF24L01_DEFAULT_CHANNEL 72
 
 /*******************************LED 灯定义 */
 #define LED_RCC RCC_APB2Periph_GPIOB

@@ -21,14 +21,14 @@
  * 创建任务前先给遥控数据安全默认值：
  *   THR 油门最低 1000, 避免上电瞬间误给油；
  *   YAW/PIT/ROL 回中 1500；
- *   NRF 默认信道 28；
+ *   NRF 默认信道 72；
  *   其他字段清零。
  */
 static void RemoterDataInit(void)
 {
     memset(&RemoterData, 0, sizeof(RemoterData));
     RemoterData.windows = 0;
-    RemoterData.NRF_Channel = 28;
+    RemoterData.NRF_Channel = 72;
     RemoterData.THR = REMOTER_RC_MIN;
     RemoterData.YAW = REMOTER_RC_CENTER;
     RemoterData.PIT = REMOTER_RC_CENTER;
